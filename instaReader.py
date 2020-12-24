@@ -128,8 +128,5 @@ class instaReader:
         self.df_posts = df_posts
         return df_posts
             
-driver = webdriver.Firefox(executable_path = 'C:\\Users\\roben\\geckodriver.exe')
-test = instaReader(driver, 'pelsias.ufrj','pels2019ufrj')
-data = test.scrapPosts()
-data.to_pickle('C:\\Users\\roben\\instaPredict\\pels_posts')
+
                             
