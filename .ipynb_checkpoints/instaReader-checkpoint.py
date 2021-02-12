@@ -11,7 +11,6 @@ from selenium.webdriver.common.action_chains import ActionChains
 from time import sleep                                #Criação de intervalos
 import pandas as pd                                   #Métodos e classes de análise de dados
 import pickle
-import numpy as np
 
 class instaReader:
     
@@ -84,18 +83,13 @@ class instaReader:
 
         sleep(2)
         
-        followers = self.driver.find_element_by_xpath("//a[contains(@class, '-nal3')]").find_element_by_tag_name('span').text
-        if '.' in followers:
-            followers = followers.replace('.','')
-        elif 'mil' in followers:
-            followers = followers.replace('mil','')
-        followers = int(followers)
-        df_posts = pd.DataFrame(columns = ['user','code','date','likes','popularity','text'])
+        followers = int(self.driver.find_element_by_xpath("//span[contains(@class, 'g47SY')]").text)
+        
+        df_posts = pd.DataFrame(columns = ['code','date','likes','text','popularity'])
         lastOne = None
         step = 1000
         start = 0
         count = 0
-        i = 0
         while True:
             sleep(2)
             self.driver.execute_script("window.scrollTo("+str(start)+", "+str(start+step)+");")
@@ -105,9 +99,6 @@ class instaReader:
                 code = element.find_element_by_tag_name('a').get_attribute('href')[28:-1]
                 df_posts = df_posts.append({'code':code}, ignore_index=True)
             start+=step
-            i+=1
-            if number_of_posts != 0 and i > number_of_posts/7 :
-                break
             if new_posts[-1] == lastOne:
                 count+=1
                 if count == 3:
@@ -115,15 +106,15 @@ class instaReader:
             else:
                 count = 0
                 lastOne = new_posts[-1]
+                
         df_posts = pd.DataFrame.drop_duplicates(df_posts).reset_index(drop = True)
 
         url = 'https://www.instagram.com/p/'
         if number_of_posts == 0: number_of_posts = len(df_posts)
-        if number_of_posts < len(df_posts):
-            df_posts = df_posts.iloc[0:number_of_posts,:]
+        df_posts = df_posts.iloc[0:number_of_posts,:]
         for i, row in df_posts.iterrows():
             self.driver.get(url+row['code'])
-            sleep(3)
+            sleep(2)
             try:
                 content = self.driver.find_element_by_xpath("//div[contains(@class, 'C4VMK')]").find_elements_by_tag_name('span')[-1].get_attribute('innerHTML')
                 row['text'] = BeautifulSoup(content, "lxml").text
@@ -132,50 +123,28 @@ class instaReader:
             try:
                 like_content = self.driver.find_element_by_xpath("//div[contains(@class, 'Nm9Fw')]")
                 liked_by_x = len(like_content.find_elements_by_tag_name('span'))-1
-                and_other_x_people = like_content.find_elements_by_tag_name('span')[-1].text
-                if '.' in and_other_x_people:
-                    and_other_x_people = and_other_x_people.replace('.','')
-                elif 'mil' in and_other_x_people:
-                    and_other_x_people = and_other_x_people.replace('mil','')
-                and_other_x_people = int(and_other_x_people)
+                and_other_x_people = int(like_content.find_elements_by_tag_name('span')[-1].text)
                 row['likes'] = liked_by_x + and_other_x_people
-                row['popularity'] = round((liked_by_x + and_other_x_people)/followers,7)
+                row['popularity'] = (liked_by_x + and_other_x_people)/followers
             except:
                 pass
             
             row['date'] = self.driver.find_element_by_tag_name('time').get_attribute('datetime')
-                                      
-        df_posts.loc[:,'user'] = user
-        self.df_posts['likes'] = np.int32(self.df_posts['likes'])
-        self.df_posts['popularity'] = np.float32(self.df_posts['popularity'])
+        
         if keep_data:
-            self.df_posts = self.df_posts.append(df_posts, ignore_index = True, sort=True)
-            self.df_users = self.df_users.append({'user':user, 'followers':followers}, ignore_index = True, sort=True)
+            self.df_posts = self.df_posts.append(df_posts.insert(0, 'user', user), ignore_index = True)
+            self.df_users = self.df_users.append({'user':user, 'followers':followers})
         return df_posts
     
-    def get_users(self, users = []):
-        self.df_users['followers'] = np.int32(self.df_users['followers'])
-        print(np.int32(self.df_users['followers']))
-        print(self.df_users)
+    def get_users(users = []):
         if users == []:
-            return self.df_users.copy()
-        returnable = pd.DataFrame(columns = self.df_users.columns.values)
-        for i, row in self.df_users.iterrows():
-            if row['user'] in users:
-                returnable = returnable.append(row, ignore_index = True, sort = True)
-        print(returnable)
-        return returnable
+            return self.df_users
+        return self.df_users[self.df_users.isin(users)]
     
-    def get_posts(self, users = []):
-        self.df_posts['likes'] = np.int32(self.df_posts['likes'])
-        self.df_posts['popularity'] = np.float32(self.df_posts['popularity'])
+    def get_posts(users = []):
         if users == []:
             return self.df_posts
-        returnable = pd.DataFrame(columns = self.df_posts.columns.values)
-        for i, row in self.df_posts.iterrows():
-            if row['user'] in users:
-                returnable = returnable.append(row, ignore_index = True, sort = True)
-        return returnable
+        return self.df_posts[self.df_posts.isin(users)]
         
             
 
